@@ -14,6 +14,7 @@ import android.view.SurfaceView
 import android.util.Log
 import android.view.Choreographer
 import android.os.Handler
+import com.robocrops.mathgalaga.BuildConfig
 
 /**
  * The main view for MathGalaga.
@@ -89,12 +90,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                         val startUpdate = System.nanoTime()
                         controller.update(deltaMs)
                         val updateTime = (System.nanoTime() - startUpdate) / 1_000_000.0
-                        Log.d("Perf", "Update: $updateTime ms")
+                        if (BuildConfig.DEBUG) {
+                            Log.d("Perf", "Update: $updateTime ms")
+                        }
 
                         val startDraw = System.nanoTime()
                         controller.draw(canvas)
                         val drawTime = (System.nanoTime() - startDraw) / 1_000_000.0
-                        Log.d("Perf", "Draw: $drawTime ms")
+                        if (BuildConfig.DEBUG) {
+                            Log.d("Perf", "Draw: $drawTime ms")
+                        }
                     }
                 } finally {
                     holder.unlockCanvasAndPost(canvas)
