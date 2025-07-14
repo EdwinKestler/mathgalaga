@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.hardware.input.InputManager
 import android.media.AudioAttributes
 import android.media.SoundPool
-import android.os.HandlerThread
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -13,7 +12,6 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.util.Log
 import android.view.Choreographer
-import android.os.Handler
 import com.robocrops.mathgalaga.BuildConfig
 
 /**
@@ -29,8 +27,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val controller: GameController
 
     // Sounds
-    private val audioThread = HandlerThread("AudioDecode").apply { start() }
-    private val audioHandler = Handler(audioThread.looper)
     private lateinit var soundPool: SoundPool
     private var shootSoundId: Int = 0
     private var hitSoundId: Int = 0
@@ -246,7 +242,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         pause()
         soundPool.release()
-        audioThread.quitSafely()
     }
 
     /**
