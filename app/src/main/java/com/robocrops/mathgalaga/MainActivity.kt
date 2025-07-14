@@ -37,8 +37,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (gameView.onKeyDown(event.keyCode, event)) return true
-        if (gameView.onKeyUp(event.keyCode, event)) return true
+        // Only forward key events that match the current action. This prevents
+        // spurious "button down" events when releasing keys.
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> if (gameView.onKeyDown(event.keyCode, event)) return true
+            KeyEvent.ACTION_UP -> if (gameView.onKeyUp(event.keyCode, event)) return true
+        }
         return super.dispatchKeyEvent(event)
     }
 
