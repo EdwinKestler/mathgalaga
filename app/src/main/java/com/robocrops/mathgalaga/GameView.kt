@@ -106,8 +106,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        if (event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-            && event.action == MotionEvent.ACTION_MOVE) {
+        val isJoystick = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
+        val isGamepad = event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD
+        if ((isJoystick || isGamepad) && event.action == MotionEvent.ACTION_MOVE) {
             val deviceId = event.deviceId
             if (calibratingPlayer != -1 && !detectedDevices.contains(deviceId)) {
                 // Detect during calibration if movement is significant
