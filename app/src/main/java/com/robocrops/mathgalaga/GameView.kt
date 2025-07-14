@@ -36,6 +36,22 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val joystickY = FloatArray(2)
     private val firePressed = BooleanArray(2)
 
+    // List of button key codes that trigger firing
+    private val FIRE_BUTTON_CODES = setOf(
+        KeyEvent.KEYCODE_BUTTON_A,
+        KeyEvent.KEYCODE_BUTTON_B,
+        KeyEvent.KEYCODE_BUTTON_X,
+        KeyEvent.KEYCODE_BUTTON_Y,
+        KeyEvent.KEYCODE_BUTTON_R1,
+        KeyEvent.KEYCODE_BUTTON_11
+    )
+
+    private val lastFirePressTime = LongArray(2)
+
+    private companion object {
+        const val FIRE_COOLDOWN_MS = 200L
+    }
+
     // Debounce logic for fire (avoid firing too fast)
     private val fireButtonWasPressed = BooleanArray(2)
 
@@ -131,15 +147,19 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val deviceId = event.deviceId
-        if (calibratingPlayer != -1 && keyCode == KeyEvent.KEYCODE_BUTTON_11 && !detectedDevices.contains(deviceId)) {
+        if (calibratingPlayer != -1 && keyCode in FIRE_BUTTON_CODES && !detectedDevices.contains(deviceId)) {
             onCalibrationDetected?.invoke(deviceId, calibratingPlayer, true)
             detectedDevices.add(deviceId)
             return true
         }
         val player = playerFireButtonMap[deviceId] ?: playerJoystickMap[deviceId] ?: return super.onKeyDown(keyCode, event)
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_11) { // 198
-            firePressed[player] = true
-            Log.d("MathGalaga", "Joystick button DOWN detected for player $player! (keyCode $keyCode, source: ${event.source})")
+        if (keyCode in FIRE_BUTTON_CODES) {
+            val now = System.currentTimeMillis()
+            if (now - lastFirePressTime[player] >= FIRE_COOLDOWN_MS) {
+                firePressed[player] = true
+                lastFirePressTime[player] = now
+                Log.d("MathGalaga", "Joystick button DOWN detected for player $player! (keyCode $keyCode, source: ${event.source})")
+            }
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -147,7 +167,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         val player = playerFireButtonMap[event.deviceId] ?: playerJoystickMap[event.deviceId] ?: return super.onKeyUp(keyCode, event)
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_11) { // 198
+        if (keyCode in FIRE_BUTTON_CODES) {
             firePressed[player] = false
             Log.d("MathGalaga", "Joystick button UP detected for player $player! (keyCode $keyCode, source: ${event.source})")
             return true
