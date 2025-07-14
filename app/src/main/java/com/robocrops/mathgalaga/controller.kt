@@ -1,8 +1,6 @@
 package com.robocrops.mathgalaga
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -20,10 +18,10 @@ data class Position(var x: Float, var y: Float)
 data class Size(val width: Int, val height: Int)
 data class Velocity(val vx: Int, val vy: Int)
 data class AlienMovement(var speed: Int, var direction: Int)
-data class Shooter(var interval: Long, var last_shot: Long, var chance: Double?, var bullet_speed: Int)
-data class Player(var color: Int, var dm: DifficultyManager, var lives: Int, var score: Double, var problem: Map<String, Any>, var streak: Int, var state: String, var respawn_time: Long, var cleared_top: Boolean, var start_x: Float)
+data class Shooter(var interval: Long, var lastShot: Long, var chance: Double?, var bulletSpeed: Int)
+data class Player(var color: Int, var dm: DifficultyManager, var lives: Int, var score: Double, var problem: Map<String, Any>, var streak: Int, var state: String, var respawnTime: Long, var clearedTop: Boolean, var startX: Float)
 data class Alien(val number: Int?, val shape: String)
-data class Bullet(val owner_eid: Int)
+data class Bullet(val ownerEid: Int)
 data class Explosion(val start: Long)
 data class Lifespan(val start: Long, val duration: Long)
 data class FloatUp(val speed: Int)
@@ -77,10 +75,10 @@ class ShootingSystem(controller: GameController) : BaseSystem(controller) {
                 // Alien shooting - scale chance for frame-rate independence
                 val scaledChance = s.chance!! * deltaFactor
                 if (Random.nextFloat() < scaledChance
-                    && now - s.last_shot > s.interval
+                    && now - s.lastShot > s.interval
                 ) {
-                    controller.createBullet(eid, s.bullet_speed)
-                    s.last_shot = now
+                    controller.createBullet(eid, s.bulletSpeed)
+                    s.lastShot = now
                 }
             }
             // Player shooting: Handled in input
@@ -145,7 +143,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
         }
         // Process all hits
         hits.forEach { (bEid, targetEid) ->
-            val ownerEid = (controller.world["bullet"]?.get(bEid) as? Bullet)?.owner_eid ?: return@forEach
+            val ownerEid = (controller.world["bullet"]?.get(bEid) as? Bullet)?.ownerEid ?: return@forEach
             controller.removeEntity(bEid)
             if (controller.playerEids.contains(targetEid)) {
                 // Alien bullet hit player
@@ -155,7 +153,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 controller.view.playHitSound()
                 if (p.lives > 0) {
                     p.state = "respawning"
-                    p.respawn_time = System.currentTimeMillis()
+                    p.respawnTime = System.currentTimeMillis()
                 } else {
                     p.state = "dead"
                 }
@@ -166,7 +164,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 val a = controller.world["alien"]?.get(targetEid) as? Alien ?: return@forEach
                 var canKill = true
                 if (a.number != null) {
-                    if (a.number != (p.problem["answer"] as? Int) || p.cleared_top)
+                    if (a.number != (p.problem["answer"] as? Int) || p.clearedTop)
                         canKill = false
                 }
                 if (!canKill) return@forEach
@@ -188,7 +186,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 if (a.number == null) {
                     p.score += 1.0
                 } else {
-                    p.cleared_top = true
+                    p.clearedTop = true
                     p.streak += 1
                     val bonus = 1 + 0.1 * p.streak
                     p.score += bonus
@@ -228,10 +226,10 @@ class LifespanSystem(controller: GameController) : BaseSystem(controller) {
         // Respawn logic
         controller.world["player"]?.forEach { (eid, pAny) ->
             val p = pAny as? Player ?: return@forEach
-            if (p.state == "respawning" && now - p.respawn_time > Config.PlayerSettings.RESPAWN_DURATION) {
+            if (p.state == "respawning" && now - p.respawnTime > Config.PlayerSettings.RESPAWN_DURATION) {
                 p.state = "active"
                 val pos = controller.world["position"]?.get(eid) as? Position ?: return@forEach
-                pos.x = p.start_x
+                pos.x = p.startX
             }
         }
     }
@@ -333,11 +331,11 @@ class PlayingState(controller: GameController) : BaseState(controller) {
         controller.boundsSystem.update(delta)
         // Level advance
         if (controller.playerEids.all {
-                (controller.world["player"]?.get(it) as? Player)?.cleared_top ?: false
+                (controller.world["player"]?.get(it) as? Player)?.clearedTop ?: false
             }) {
             controller.playerEids.forEach { eid ->
                 val p = controller.world["player"]?.get(eid) as? Player ?: return@forEach
-                p.cleared_top = false
+                p.clearedTop = false
                 p.problem = generateAdaptiveProblem(p.dm)
             }
             controller.level++
@@ -776,9 +774,9 @@ class GameController(val context: Context, val view: GameView) {
                 // Shoot if tap above player y
                 val s = world["shooter"]?.get(eid) as? Shooter ?: return
                 val now = System.currentTimeMillis()
-                if (event.y < pos.y && now - s.last_shot > s.interval) {
-                    createBullet(eid, s.bullet_speed)
-                    s.last_shot = now
+                if (event.y < pos.y && now - s.lastShot > s.interval) {
+                    createBullet(eid, s.bulletSpeed)
+                    s.lastShot = now
                     view.playShootSound()
                 }
             }
@@ -807,10 +805,10 @@ class GameController(val context: Context, val view: GameView) {
             Log.d("MathGalaga", "Joystick fire requested for player $playerIndex!")
             val s = world["shooter"]?.get(eid) as? Shooter ?: return
             val now = System.currentTimeMillis()
-            if (now - s.last_shot > s.interval) {
+            if (now - s.lastShot > s.interval) {
                 Log.d("MathGalaga", "Creating bullet for player $playerIndex!")
-                createBullet(eid, s.bullet_speed)
-                s.last_shot = now
+                createBullet(eid, s.bulletSpeed)
+                s.lastShot = now
                 view.playShootSound()
             }
         }
