@@ -489,9 +489,11 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     }
 
     private fun setupCalibration() {
-        controller.view.startCalibration { deviceId, player, isFire ->
-            controller.view.playerJoystickMap[deviceId] = player
-            Log.d("MathGalaga", "Calibrated device $deviceId for player $player (isFire: $isFire)")
+        val player = if (currentStep == 0 || currentStep == 2) 0 else 1
+        controller.view.setCalibratingPlayer(player)
+        controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
+            controller.view.playerJoystickMap[deviceId] = calibratedPlayer
+            Log.d("MathGalaga", "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)")
             startPause()
         }
     }
