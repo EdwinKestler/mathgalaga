@@ -40,6 +40,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val fireButtonWasPressed = BooleanArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
+    val playerFireButtonMap = mutableMapOf<Int, Int>() // deviceId to playerIndex for firing
 
     // Calibration mode
     var calibratingPlayer: Int = -1
@@ -135,7 +136,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             detectedDevices.add(deviceId)
             return true
         }
-        val player = playerJoystickMap[deviceId] ?: return super.onKeyDown(keyCode, event)
+        val player = playerFireButtonMap[deviceId] ?: playerJoystickMap[deviceId] ?: return super.onKeyDown(keyCode, event)
         if (keyCode == KeyEvent.KEYCODE_BUTTON_11) { // 198
             firePressed[player] = true
             Log.d("MathGalaga", "Joystick button DOWN detected for player $player! (keyCode $keyCode, source: ${event.source})")
@@ -145,7 +146,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        val player = playerJoystickMap[event.deviceId] ?: return super.onKeyUp(keyCode, event)
+        val player = playerFireButtonMap[event.deviceId] ?: playerJoystickMap[event.deviceId] ?: return super.onKeyUp(keyCode, event)
         if (keyCode == KeyEvent.KEYCODE_BUTTON_11) { // 198
             firePressed[player] = false
             Log.d("MathGalaga", "Joystick button UP detected for player $player! (keyCode $keyCode, source: ${event.source})")
@@ -290,6 +291,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onInputDeviceRemoved(deviceId: Int) {
         playerJoystickMap.remove(deviceId)
+        playerFireButtonMap.remove(deviceId)
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
