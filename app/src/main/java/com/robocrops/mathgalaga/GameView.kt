@@ -173,7 +173,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     fun startCalibration(onDetected: (deviceId: Int, player: Int, isFire: Boolean) -> Unit) {
         onCalibrationDetected = onDetected
-        calibratingPlayer = 0 // Start with player 1
         detectedDevices.clear() // Clear for new calibration
     }
 
