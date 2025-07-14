@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme (Material3, no action bar, full screen). -->
+    <style name="Base.Theme.MathGalaga" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Set your app's primary branding colors here if desired. -->
+        <!-- Example: <item name="colorPrimary">@color/your_primary</item> -->
+        <item name="android:windowFullscreen">true</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+    </style>
+
+    <!-- Main app theme, can be extended if you want dark/light overrides. -->
+    <style name="Theme.MathGalaga" parent="Base.Theme.MathGalaga" />
+
+    <!-- Explicit NoActionBar variant (for backward compatibility). -->
+    <style name="Theme.MathGalaga.NoActionBar" parent="Theme.MathGalaga">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
