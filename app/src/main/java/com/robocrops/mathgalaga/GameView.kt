@@ -300,11 +300,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onInputDeviceAdded(deviceId: Int) {
         val device = InputDevice.getDevice(deviceId) ?: return
-        if ((device.sources and InputDevice.SOURCE_JOYSTICK != 0) && device.name.contains("Joystick")) {
+        val hasJoystick = device.sources and InputDevice.SOURCE_JOYSTICK != 0
+        val hasGamepad = device.sources and InputDevice.SOURCE_GAMEPAD != 0
+        if (hasJoystick || hasGamepad) {
             if (playerJoystickMap.size < 2) {
                 val player = playerJoystickMap.size
                 playerJoystickMap[deviceId] = player
-                Log.d("MathGalaga", "Fallback assigned joystick device $deviceId (${device.name}) to player $player")
+                Log.d(
+                    "MathGalaga",
+                    "Fallback assigned joystick device $deviceId (${device.name}) to player $player"
+                )
             }
         }
     }
