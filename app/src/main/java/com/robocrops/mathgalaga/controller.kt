@@ -119,7 +119,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 val aEid = sortedAliens[j]
                 if (controller.world["explosion"]?.containsKey(aEid) == true) continue
                 val aPos = controller.world["position"]?.get(aEid) as? Position ?: continue
-                val aSize = controller.world["size"]?.get(aEid) as? Size ?: continue
+                controller.world["size"]?.get(aEid) as? Size ?: continue
                 if (aPos.x > bPos.x + bSize.width) break // No more overlaps
                 val aRect = controller.getRect(aEid)
                 if (Utils.collides(bRect, aRect)) {
@@ -259,7 +259,7 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
             if (controller.playerEids.contains(eid) &&
                 (controller.world["player"]?.get(eid) as? Player)?.state == "dead"
             ) continue
-            val r = controller.world["render"]?.get(eid) as? Map<String, Any> ?: continue
+            val r = controller.world["render"]?.get(eid) as? Map<*, *> ?: continue
             val pos = controller.world["position"]?.get(eid) as? Position ?: continue
             val size = controller.world["size"]?.get(eid) as? Size ?: Size(0, 0)
             when (r["type"]) {
@@ -347,7 +347,7 @@ class PlayingState(controller: GameController) : BaseState(controller) {
         }
         // Check for player death
         if (controller.playerEids.any {
-                (controller.world["player"]?.get(it) as? Player)?.lives ?: 1 <= 0
+                ((controller.world["player"]?.get(it) as? Player)?.lives ?: 1) <= 0
             }) {
             controller.switchState("game_over")
         }
@@ -795,7 +795,7 @@ class GameController(val context: Context, val view: GameView) {
         val p = world["player"]?.get(eid) as? Player ?: return
         if (p.state != "active") return
         val pos = world["position"]?.get(eid) as? Position ?: return
-        val speed = (world["player_movement"]?.get(eid) as? Map<String, Int>)?.get("speed") ?: 10
+        val speed = (world["player_movement"]?.get(eid) as? Map<*, Int>)?.get("speed") ?: 10
         pos.x += dx * speed.toFloat()
         pos.y += dy * speed.toFloat()
         val size = world["size"]?.get(eid) as? Size ?: return

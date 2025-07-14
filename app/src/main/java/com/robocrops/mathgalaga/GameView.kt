@@ -13,7 +13,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.util.Log
 import android.view.Choreographer
-import android.os.Handler
+import kotlin.math.abs
 
 /**
  * The main view for MathGalaga.
@@ -29,7 +29,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     // Sounds
     private val audioThread = HandlerThread("AudioDecode").apply { start() }
-    private val audioHandler = Handler(audioThread.looper)
     private lateinit var soundPool: SoundPool
     private var shootSoundId: Int = 0
     private var hitSoundId: Int = 0
@@ -111,7 +110,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             val deviceId = event.deviceId
             if (calibratingPlayer != -1 && !detectedDevices.contains(deviceId)) {
                 // Detect during calibration if movement is significant
-                if (Math.abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f || Math.abs(event.getAxisValue(MotionEvent.AXIS_Y)) > 0.1f) {
+                if (abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f || abs(event.getAxisValue(MotionEvent.AXIS_Y)) > 0.1f) {
                     onCalibrationDetected?.invoke(deviceId, calibratingPlayer, false)
                     detectedDevices.add(deviceId)
                     return true
@@ -119,8 +118,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             }
             val player = playerJoystickMap[deviceId] ?: return super.onGenericMotionEvent(event)
             // Input debouncing: apply deadzone
-            joystickX[player] = if (Math.abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_X) else 0f
-            joystickY[player] = if (Math.abs(event.getAxisValue(MotionEvent.AXIS_Y)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_Y) else 0f
+            joystickX[player] = if (abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_X) else 0f
+            joystickY[player] = if (abs(event.getAxisValue(MotionEvent.AXIS_Y)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_Y) else 0f
             return true
         }
         return super.onGenericMotionEvent(event)
