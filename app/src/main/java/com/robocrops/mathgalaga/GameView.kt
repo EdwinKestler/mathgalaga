@@ -58,13 +58,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val lastFireTime = LongArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
-    val playerDeviceIds = intArrayOf(9, 5) // player 0 (red): device 5, player 1 (blue): device 4
+    val playerDeviceIds = intArrayOf(9, 5) // player 0 (red): device 9, player 1 (blue): device 5
 
     // Calibration mode
     var calibratingPlayer: Int = -1
         private set
     private var onCalibrationDetected: ((deviceId: Int, player: Int, isFire: Boolean) -> Unit)? = null
-    private val detectedDevices = mutableSetOf<Int>() // To prevent re-detection of the same device
 
     // Choreographer for vsync-aware rendering
     private val choreographer: Choreographer = Choreographer.getInstance()
@@ -148,15 +147,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         if (event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
             && event.action == MotionEvent.ACTION_MOVE) {
             val deviceId = event.deviceId
-            if (calibratingPlayer != -1 && !detectedDevices.contains(deviceId)) {
-                // Detect during calibration if movement is significant
-                if (abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f || abs(
-                        event.getAxisValue(
-                            MotionEvent.AXIS_Y
-                        )
-                    ) > 0.1f) {
+            if (calibratingPlayer != -1) {
+                val axisX = event.getAxisValue(MotionEvent.AXIS_X)
+                var trigger = false
+                if (calibratingPlayer == 0 && axisX <= -0.99f) {
+                    trigger = true
+                } else if (calibratingPlayer == 1 && axisX >= 0.99f) {
+                    trigger = true
+                }
+                if (trigger) {
                     onCalibrationDetected?.invoke(deviceId, calibratingPlayer, false)
-                    detectedDevices.add(deviceId)
                     return true
                 }
             }
@@ -171,9 +171,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val deviceId = event.deviceId
-        if (calibratingPlayer != -1 && FIRE_BUTTON_CODES.contains(keyCode) && !detectedDevices.contains(deviceId)) {
+        if (calibratingPlayer != -1 && FIRE_BUTTON_CODES.contains(keyCode)) {
             onCalibrationDetected?.invoke(deviceId, calibratingPlayer, true)
-            detectedDevices.add(deviceId)
             return true
         }
         val player = playerJoystickMap[deviceId] ?: return super.onKeyDown(keyCode, event)
@@ -206,8 +205,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     fun startCalibration(onDetected: (deviceId: Int, player: Int, isFire: Boolean) -> Unit) {
         onCalibrationDetected = onDetected
-        calibratingPlayer = 0 // Start with player 1
-        detectedDevices.clear() // Clear for new calibration
     }
 
     fun calibrateNextPlayer() {
@@ -217,7 +214,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     fun endCalibration() {
         calibratingPlayer = -1
         onCalibrationDetected = null
-        detectedDevices.clear()
     }
 
     fun setCalibratingPlayer(player: Int) {

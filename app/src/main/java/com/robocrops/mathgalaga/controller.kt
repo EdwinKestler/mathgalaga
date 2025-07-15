@@ -477,8 +477,8 @@ class WinState(controller: GameController) : BaseState(controller) {
 class CalibrationState(controller: GameController) : BaseState(controller) {
     private var currentStep = 0
     private val messages = listOf(
-        "Player 1: Move RED joystick",
-        "Player 2: Move BLUE joystick",
+        "Player 1: Move RED joystick all the way LEFT",
+        "Player 2: Move BLUE joystick all the way RIGHT",
         "Player 1: Press RED fire button",
         "Player 2: Press BLUE fire button"
     )
@@ -492,8 +492,20 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
 
     private fun setupCalibration() {
         val player = currentStep % 2
+        if (currentStep == 0) {
+            Log.d("MathGalaga", "now calibrating first player")
+        } else if (currentStep == 1) {
+            Log.d("MathGalaga", "now calibrating second player")
+        }
+        Log.d("MathGalaga", "Setup calibration for step $currentStep, player $player")
         controller.view.setCalibratingPlayer(player)
         controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
+            Log.d("MathGalaga", "Detection for player $calibratedPlayer, device $deviceId, isFire $isFire")
+            val isMoveStep = currentStep < 2
+            if (isMoveStep == isFire) {
+                Log.d("MathGalaga", "Wrong input type for step $currentStep (isFire: $isFire), ignoring")
+                return@startCalibration
+            }
             if (deviceId != controller.view.playerDeviceIds[calibratedPlayer]) {
                 Log.d("MathGalaga", "Wrong device $deviceId for player $calibratedPlayer (expected ${controller.view.playerDeviceIds[calibratedPlayer]}), ignoring")
                 return@startCalibration
@@ -502,6 +514,8 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
                 "MathGalaga",
                 "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)"
             )
+            controller.view.playerJoystickMap[deviceId] = calibratedPlayer
+            Log.d("MathGalaga", "player ${calibratedPlayer + 1} calibrated successfully")
             controller.view.setCalibratingPlayer(-1)
             isPausing = true
             handler.postDelayed({ advanceStep() }, 1500)
@@ -509,8 +523,10 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     }
 
     private fun advanceStep() {
+        Log.d("MathGalaga", "Advancing from step $currentStep")
         isPausing = false
         currentStep++
+        Log.d("MathGalaga", "To step $currentStep")
         if (currentStep >= messages.size) {
             controller.view.endCalibration()
             controller.switchState("level_transition")
