@@ -1,3 +1,4 @@
+// MainActivity.kt (refactored for kiosk mode: full screen, immersive, no navigation)
 package com.robocrops.mathgalaga
 
 import android.content.pm.ActivityInfo
@@ -6,6 +7,8 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
+
 /**
  * The main and only Activity for MathGalaga.
  * Hosts the GameView and manages its lifecycle.
@@ -16,19 +19,20 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        Config.initSprites(this) // <-- This fixes your crash!
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        // Set immersive kiosk mode: hide system UI, navigation, full screen
+        window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+        Config.initSprites(this)
         gameView = GameView(this)
-
-        // Set the content view to the game view
-        // This replaces the need for XML layouts
-        // and allows us to use the custom GameView directly
         setContentView(gameView)
-
-        // Set orientation to landscape
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-
-        // Enable edge-to-edge mode if needed
-
     }
 
     override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {

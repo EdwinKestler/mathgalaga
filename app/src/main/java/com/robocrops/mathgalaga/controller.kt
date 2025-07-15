@@ -1,3 +1,4 @@
+// controller.kt (refactored: remove touch handling; auto-restart on game over/win after delay)
 package com.robocrops.mathgalaga
 
 import android.content.Context
@@ -8,7 +9,6 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.MotionEvent
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
@@ -316,7 +316,7 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
 // -- GAME STATES --
 
 abstract class BaseState(protected val controller: GameController) {
-    open fun handleTouch(event: MotionEvent) {}
+    // Removed: open fun handleTouch(event: MotionEvent) {}  (no touch support)
     open fun update(delta: Double) {}
     open fun draw(canvas: Canvas) {}
 }
@@ -425,10 +425,17 @@ class LevelTransitionState(controller: GameController) : BaseState(controller) {
 }
 
 class GameOverState(controller: GameController) : BaseState(controller) {
+    init {
+        // Auto-restart after 5 seconds for arcade mode
+        Handler(Looper.getMainLooper()).postDelayed({
+            controller.restartGame()
+        }, 5000L)
+    }
+
     override fun draw(canvas: Canvas) {
         canvas.drawColor(Config.ColorSettings.BLACK)
         val over = "Better luck next time"
-        val instr = "Tap to retry or back to exit"
+        val instr = "Restarting in 5 seconds..."
         val paint = Config.FontSettings.MAIN
         val boundsOver = Rect()
         paint.getTextBounds(over, 0, over.length, boundsOver)
@@ -450,10 +457,17 @@ class GameOverState(controller: GameController) : BaseState(controller) {
 }
 
 class WinState(controller: GameController) : BaseState(controller) {
+    init {
+        // Auto-restart after 5 seconds for arcade mode
+        Handler(Looper.getMainLooper()).postDelayed({
+            controller.restartGame()
+        }, 5000L)
+    }
+
     override fun draw(canvas: Canvas) {
         canvas.drawColor(Config.ColorSettings.BLACK)
         val winMsg = "Congratulations! You Won!"
-        val instr = "Tap to play again or back to exit"
+        val instr = "Restarting in 5 seconds..."
         val paint = Config.FontSettings.MAIN
         val boundsWin = Rect()
         paint.getTextBounds(winMsg, 0, winMsg.length, boundsWin)
@@ -494,7 +508,6 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     private fun setupCalibration() {
         val player = if (currentStep % 4 < 2) currentStep % 2 else currentStep % 2
         controller.view.setCalibratingPlayer(player)
-        // In CalibrationState's setupCalibration(), inside view.startCalibration { ... }
         controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
             // Assign to joystick map regardless (since same device)
             controller.view.playerJoystickMap[deviceId] = calibratedPlayer
@@ -576,7 +589,6 @@ class GameController(val context: Context, val view: GameView) {
         playerEids.add(newEntity())
         playerEids.add(newEntity())
         setupPlayers()
-
         currentState = CalibrationState(this) // Start here instead of LevelTransitionState
     }
 
@@ -768,34 +780,7 @@ class GameController(val context: Context, val view: GameView) {
 
     fun draw(canvas: Canvas) = currentState.draw(canvas)
 
-    fun handleTouch(event: MotionEvent) {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                val mid = Config.ScreenSettings.WIDTH / 2f
-                val eid = if (event.x < mid) playerEids[0] else playerEids[1]
-                val p = world["player"]?.get(eid) as? Player ?: return
-                if (p.state != "active") return
-                val pos = world["position"]?.get(eid) as? Position ?: return
-                val size = world["size"]?.get(eid) as? Size ?: return
-                pos.x = max(0f, min(event.x - size.width / 2f, Config.ScreenSettings.WIDTH - size.width.toFloat()))
-                // Shoot if tap above player y
-                val s = world["shooter"]?.get(eid) as? Shooter ?: return
-                val now = System.currentTimeMillis()
-                if (event.y < pos.y && now - s.lastShot > s.interval) {
-                    createBullet(eid, s.bulletSpeed)
-                    s.lastShot = now
-                    view.playShootSound()
-                }
-            }
-        }
-        currentState.handleTouch(event)
-        // Handle restart on game over/win
-        if (currentState is GameOverState || currentState is WinState) {
-            if (event.action == MotionEvent.ACTION_DOWN) {
-                restartGame()
-            }
-        }
-    }
+    // Removed: fun handleTouch(event: MotionEvent) {}  (no touch support)
 
     fun handleJoystick(playerIndex: Int, dx: Float, dy: Float, shouldFire: Boolean) {
         val eid = playerEids.getOrNull(playerIndex) ?: return

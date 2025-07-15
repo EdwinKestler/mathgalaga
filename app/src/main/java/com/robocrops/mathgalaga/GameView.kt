@@ -1,3 +1,4 @@
+// GameView.kt (refactored: disable touch by consuming events without action; no changes to joystick handling)
 package com.robocrops.mathgalaga
 
 import android.content.Context
@@ -288,11 +289,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     /**
-     * Forwards all touch events to the game controller.
+     * Consume all touch events without action (disable touch input for arcade mode)
      */
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        controller.handleTouch(event)
-        return true
+        return true  // Consume event but do nothing
     }
 
     override fun onInputDeviceAdded(deviceId: Int) {
