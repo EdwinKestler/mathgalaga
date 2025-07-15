@@ -1,4 +1,4 @@
-// controller.kt (refactored: remove touch handling; auto-restart on game over/win after delay)
+// controller.kt (refactored: remove touch handling; handle restart on button press in end states)
 package com.robocrops.mathgalaga
 
 import android.content.Context
@@ -316,7 +316,6 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
 // -- GAME STATES --
 
 abstract class BaseState(protected val controller: GameController) {
-    // Removed: open fun handleTouch(event: MotionEvent) {}  (no touch support)
     open fun update(delta: Double) {}
     open fun draw(canvas: Canvas) {}
 }
@@ -425,17 +424,10 @@ class LevelTransitionState(controller: GameController) : BaseState(controller) {
 }
 
 class GameOverState(controller: GameController) : BaseState(controller) {
-    init {
-        // Auto-restart after 5 seconds for arcade mode
-        Handler(Looper.getMainLooper()).postDelayed({
-            controller.restartGame()
-        }, 5000L)
-    }
-
     override fun draw(canvas: Canvas) {
         canvas.drawColor(Config.ColorSettings.BLACK)
         val over = "Better luck next time"
-        val instr = "Restarting in 5 seconds..."
+        val instr = "Press any button to restart"
         val paint = Config.FontSettings.MAIN
         val boundsOver = Rect()
         paint.getTextBounds(over, 0, over.length, boundsOver)
@@ -457,17 +449,10 @@ class GameOverState(controller: GameController) : BaseState(controller) {
 }
 
 class WinState(controller: GameController) : BaseState(controller) {
-    init {
-        // Auto-restart after 5 seconds for arcade mode
-        Handler(Looper.getMainLooper()).postDelayed({
-            controller.restartGame()
-        }, 5000L)
-    }
-
     override fun draw(canvas: Canvas) {
         canvas.drawColor(Config.ColorSettings.BLACK)
         val winMsg = "Congratulations! You Won!"
-        val instr = "Restarting in 5 seconds..."
+        val instr = "Press any button to play again"
         val paint = Config.FontSettings.MAIN
         val boundsWin = Rect()
         paint.getTextBounds(winMsg, 0, winMsg.length, boundsWin)
@@ -492,10 +477,10 @@ class WinState(controller: GameController) : BaseState(controller) {
 class CalibrationState(controller: GameController) : BaseState(controller) {
     private var currentStep = 0
     private val messages = listOf(
-        "Player 1: Move joystick",
-        "Player 2: Move joystick",
-        "Player 1: Press fire button",
-        "Player 2: Press fire button"
+        "Player 1: Move RED joystick",
+        "Player 2: Move BLUE joystick",
+        "Player 1: Press RED fire button",
+        "Player 2: Press BLUE fire button"
     )
 
     private var isPausing = false
@@ -506,11 +491,13 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     }
 
     private fun setupCalibration() {
-        val player = if (currentStep % 4 < 2) currentStep % 2 else currentStep % 2
+        val player = currentStep % 2
         controller.view.setCalibratingPlayer(player)
         controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
-            // Assign to joystick map regardless (since same device)
-            controller.view.playerJoystickMap[deviceId] = calibratedPlayer
+            if (deviceId != controller.view.playerDeviceIds[calibratedPlayer]) {
+                Log.d("MathGalaga", "Wrong device $deviceId for player $calibratedPlayer (expected ${controller.view.playerDeviceIds[calibratedPlayer]}), ignoring")
+                return@startCalibration
+            }
             Log.d(
                 "MathGalaga",
                 "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)"
@@ -592,12 +579,14 @@ class GameController(val context: Context, val view: GameView) {
         currentState = CalibrationState(this) // Start here instead of LevelTransitionState
     }
 
+    fun isEndState(): Boolean = currentState is GameOverState || currentState is WinState
+
     private fun setupPlayers() {
         val dm1 = DifficultyManager()
         val dm2 = DifficultyManager()
-        val colors = listOf(Config.ColorSettings.BLUE, Config.ColorSettings.RED)
+        val colors = listOf(Config.ColorSettings.RED, Config.ColorSettings.BLUE)
         val startXs = listOf(100f, 600f)
-        val sprites = listOf(Config.playerBlueSprite, Config.playerRedSprite)
+        val sprites = listOf(Config.playerRedSprite, Config.playerBlueSprite)
         playerEids.forEachIndexed { i, eid ->
             val sprite = sprites[i]
             val size = Size(sprite.width, sprite.height)

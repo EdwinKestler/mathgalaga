@@ -57,7 +57,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val lastFireTime = LongArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
-    // Removed: playerFireButtonMap (unused, as buttons and axes are on same device)
+    val playerDeviceIds = intArrayOf(9, 5) // player 0 (red): device 5, player 1 (blue): device 4
 
     // Calibration mode
     var calibratingPlayer: Int = -1
@@ -104,12 +104,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                         val startUpdate = System.nanoTime()
                         controller.update(deltaMs)
                         val updateTime = (System.nanoTime() - startUpdate) / 1_000_000.0
-                        Log.d("Perf", "Update: $updateTime ms")
+                        //Log.d("Perf", "Update: $updateTime ms")
 
                         val startDraw = System.nanoTime()
                         controller.draw(canvas)
                         val drawTime = (System.nanoTime() - startDraw) / 1_000_000.0
-                        Log.d("Perf", "Draw: $drawTime ms")
+                        //Log.d("Perf", "Draw: $drawTime ms")
                     }
                 } finally {
                     holder.unlockCanvasAndPost(canvas)
@@ -130,10 +130,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val inputManager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
         inputManager.registerInputDeviceListener(this, null)
 
-        // Scan existing devices (optional fallback assignment)
+        // Scan existing devices and assign based on specific IDs
         for (deviceId in inputManager.inputDeviceIds) {
             onInputDeviceAdded(deviceId)
         }
+
+        // Hardcode assignments in case not added yet
+        playerJoystickMap[playerDeviceIds[0]] = 0
+        playerJoystickMap[playerDeviceIds[1]] = 1
 
         controller = GameController(context, this)
         initSounds()
@@ -174,7 +178,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 firePressed[player] = true
                 lastFireTime[player] = now
             }
-            Log.d("MathGalaga", "Joystick button DOWN detected for player $player! (keyCode $keyCode, source: ${event.source})")
+            Log.d("MathGalaga", "Joystick button DOWN detected for player $player! (keyCode $keyCode, source: ${event.source}, deviceId: $deviceId)")
+            // Check for end states and restart if button pressed
+            if (controller.isEndState()) {
+                controller.restartGame()
+                return true
+            }
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -184,7 +193,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val player = playerJoystickMap[event.deviceId] ?: return super.onKeyUp(keyCode, event)
         if (FIRE_BUTTON_CODES.contains(keyCode)) {
             firePressed[player] = false
-            Log.d("MathGalaga", "Joystick button UP detected for player $player! (keyCode $keyCode, source: ${event.source})")
+            Log.d("MathGalaga", "Joystick button UP detected for player $player! (keyCode $keyCode, source: ${event.source}, deviceId: ${event.deviceId})")
             return true
         }
         return super.onKeyUp(keyCode, event)
@@ -300,20 +309,18 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val hasJoystick = device.sources and InputDevice.SOURCE_JOYSTICK != 0
         val hasGamepad = device.sources and InputDevice.SOURCE_GAMEPAD != 0
         if (hasJoystick || hasGamepad) {
-            if (playerJoystickMap.size < 2) {
-                val player = playerJoystickMap.size
-                playerJoystickMap[deviceId] = player
-                Log.d(
-                    "MathGalaga",
-                    "Fallback assigned joystick device $deviceId (${device.name}) to player $player"
-                )
+            if (deviceId == playerDeviceIds[0]) {
+                playerJoystickMap[deviceId] = 0
+                Log.d("MathGalaga", "Assigned joystick device $deviceId (${device.name}) to player 0")
+            } else if (deviceId == playerDeviceIds[1]) {
+                playerJoystickMap[deviceId] = 1
+                Log.d("MathGalaga", "Assigned joystick device $deviceId (${device.name}) to player 1")
             }
         }
     }
 
     override fun onInputDeviceRemoved(deviceId: Int) {
         playerJoystickMap.remove(deviceId)
-        // Removed: playerFireButtonMap.remove(deviceId)
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
