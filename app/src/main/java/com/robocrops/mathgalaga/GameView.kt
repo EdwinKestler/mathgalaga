@@ -15,11 +15,14 @@ import android.util.Log
 import android.view.Choreographer
 import android.os.Handler
 
+// Updated: Include BUTTON_1 (188) through BUTTON_16 (203) for DragonRise and similar joysticks
+// Retain original codes for broader compatibility
 private val FIRE_BUTTON_CODES = intArrayOf(
-    KeyEvent.KEYCODE_BUTTON_A,
-    KeyEvent.KEYCODE_BUTTON_R1,
-    KeyEvent.KEYCODE_BUTTON_B,
-    KeyEvent.KEYCODE_BUTTON_X
+    KeyEvent.KEYCODE_BUTTON_A,      // 96
+    KeyEvent.KEYCODE_BUTTON_B,      // 97
+    KeyEvent.KEYCODE_BUTTON_X,      // 99
+    KeyEvent.KEYCODE_BUTTON_R1,     // 103
+    *IntArray(16) { 188 + it }      // BUTTON_1 to BUTTON_16 for your joysticks (includes 193-198)
 )
 
 private const val FIRE_COOLDOWN_MS = 200L
@@ -34,7 +37,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     @Volatile private var running = false
 
     // Game controller (handles ECS, state, game logic)
-    private val controller: GameController
+    private lateinit var controller: GameController
 
     // Sounds
     private val audioThread = HandlerThread("AudioDecode").apply { start() }
@@ -53,7 +56,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val lastFireTime = LongArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
-    val playerFireButtonMap = mutableMapOf<Int, Int>() // deviceId to playerIndex for firing
+    // Removed: playerFireButtonMap (unused, as buttons and axes are on same device)
 
     // Calibration mode
     var calibratingPlayer: Int = -1
@@ -116,6 +119,25 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
     }
 
+    init {
+        holder.addCallback(this)
+
+        isFocusable = true
+        isFocusableInTouchMode = true
+        requestFocus()
+
+        val inputManager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
+        inputManager.registerInputDeviceListener(this, null)
+
+        // Scan existing devices (optional fallback assignment)
+        for (deviceId in inputManager.inputDeviceIds) {
+            onInputDeviceAdded(deviceId)
+        }
+
+        controller = GameController(context, this)
+        initSounds()
+    }
+
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
             && event.action == MotionEvent.ACTION_MOVE) {
@@ -165,25 +187,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             return true
         }
         return super.onKeyUp(keyCode, event)
-    }
-
-    init {
-        holder.addCallback(this)
-
-        isFocusable = true
-        isFocusableInTouchMode = true
-        requestFocus()
-
-        val inputManager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
-        inputManager.registerInputDeviceListener(this, null)
-
-        // Scan existing devices (optional fallback assignment)
-        for (deviceId in inputManager.inputDeviceIds) {
-            onInputDeviceAdded(deviceId)
-        }
-
-        controller = GameController(context, this)
-        initSounds()
     }
 
     fun startCalibration(onDetected: (deviceId: Int, player: Int, isFire: Boolean) -> Unit) {
@@ -310,7 +313,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onInputDeviceRemoved(deviceId: Int) {
         playerJoystickMap.remove(deviceId)
-        playerFireButtonMap.remove(deviceId)
+        // Removed: playerFireButtonMap.remove(deviceId)
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {

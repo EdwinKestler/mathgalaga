@@ -494,12 +494,10 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     private fun setupCalibration() {
         val player = if (currentStep % 4 < 2) currentStep % 2 else currentStep % 2
         controller.view.setCalibratingPlayer(player)
+        // In CalibrationState's setupCalibration(), inside view.startCalibration { ... }
         controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
-            if (isFire) {
-                controller.view.playerFireButtonMap[deviceId] = calibratedPlayer
-            } else {
-                controller.view.playerJoystickMap[deviceId] = calibratedPlayer
-            }
+            // Assign to joystick map regardless (since same device)
+            controller.view.playerJoystickMap[deviceId] = calibratedPlayer
             Log.d(
                 "MathGalaga",
                 "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)"
@@ -578,6 +576,7 @@ class GameController(val context: Context, val view: GameView) {
         playerEids.add(newEntity())
         playerEids.add(newEntity())
         setupPlayers()
+
         currentState = CalibrationState(this) // Start here instead of LevelTransitionState
     }
 
