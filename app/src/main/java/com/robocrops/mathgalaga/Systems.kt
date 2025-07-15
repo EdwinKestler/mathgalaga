@@ -304,12 +304,14 @@ class LifespanSystem(controller: GameController) : BaseSystem(controller) {
         }
 
         // Added: Remove RespawnAura after its duration
+        val auraToRemove = mutableListOf<Int>()
         controller.world["respawn_aura"]?.forEach { (eid, raAny) ->
             val ra = raAny as? RespawnAura ?: return@forEach
             if (now - ra.start > Config.RespawnAuraSettings.DURATION) {
-                controller.world["respawn_aura"]?.remove(eid)
+                auraToRemove.add(eid)
             }
         }
+        auraToRemove.forEach { controller.world["respawn_aura"]?.remove(it) }
     }
 }
 
