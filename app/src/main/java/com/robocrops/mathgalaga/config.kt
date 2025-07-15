@@ -3,6 +3,8 @@ package com.robocrops.mathgalaga
 import android.content.Context
 import android.graphics.*
 import kotlin.random.Random
+import androidx.core.graphics.createBitmap
+import com.robocrops.mathgalaga.R  // Import for direct R.drawable access
 
 object Config {
 
@@ -27,17 +29,17 @@ object Config {
     }
 
     object ColorSettings {
-        val WHITE = Color.WHITE
-        val BLACK = Color.BLACK
-        val YELLOW = Color.YELLOW
-        val GREEN = Color.GREEN
-        val RED = Color.RED
-        val BLUE = Color.BLUE
+        const val WHITE = Color.WHITE
+        const val BLACK = Color.BLACK
+        const val YELLOW = Color.YELLOW
+        const val GREEN = Color.GREEN
+        const val RED = Color.RED
+        const val BLUE = Color.BLUE
     }
 
     object PlayerSettings {
-        const val WIDTH = 40
-        const val HEIGHT = 40
+        const val WIDTH = 30
+        const val HEIGHT = 30
         const val SPEED = 8 // px per frame
         const val LIVES = 3
         const val RESPAWN_DURATION = 1000L // ms
@@ -100,7 +102,7 @@ object Config {
 
     /** Pre-rendered background bitmap with black fill and stars */
     val backgroundBitmap: Bitmap by lazy {
-        Bitmap.createBitmap(ScreenSettings.WIDTH, ScreenSettings.HEIGHT, Bitmap.Config.ARGB_8888).apply {
+        createBitmap(ScreenSettings.WIDTH, ScreenSettings.HEIGHT).apply {
             val canvas = Canvas(this)
             canvas.drawColor(ColorSettings.BLACK)
             val paint = Paint().apply { color = ColorSettings.WHITE }
@@ -117,16 +119,28 @@ object Config {
     val alienLowerSprites: MutableMap<String, Bitmap> = mutableMapOf()
     private var spritesLoaded: Boolean = false
 
+    // Map for direct resource IDs (static names)
+    private val spriteMap: Map<String, Int> = mapOf(
+        "player_blue" to R.drawable.player_blue,
+        "player_red" to R.drawable.player_red,
+        "alien_square_green" to R.drawable.alien_square_green,
+        "alien_triangle_green" to R.drawable.alien_triangle_green,
+        "alien_circle_green" to R.drawable.alien_circle_green,
+        "alien_square_red" to R.drawable.alien_square_red,
+        "alien_triangle_red" to R.drawable.alien_triangle_red,
+        "alien_circle_red" to R.drawable.alien_circle_red
+    )
+
     /**
      * Safely loads a sprite by resource name. Returns a gray placeholder if missing.
      */
     private fun loadSprite(context: Context, name: String, fallbackColor: Int = Color.GRAY): Bitmap {
-        val resId = context.resources.getIdentifier(name, "drawable", context.packageName)
+        val resId = spriteMap[name] ?: 0
         return if (resId != 0) {
             BitmapFactory.decodeResource(context.resources, resId)
         } else {
             // Create a visible placeholder
-            Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply {
+            createBitmap(32, 32).apply {
                 eraseColor(fallbackColor)
                 val c = Canvas(this)
                 val p = Paint().apply { color = Color.DKGRAY; strokeWidth = 3f }

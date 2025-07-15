@@ -7,7 +7,11 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import android.view.KeyEvent
 import android.view.MotionEvent
-import android.view.View
+//import android.view.View
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.ViewCompat
 
 /**
  * The main and only Activity for MathGalaga.
@@ -19,19 +23,23 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        // Set immersive kiosk mode: hide system UI, navigation, full screen
-        window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                )
+
         Config.initSprites(this)
         gameView = GameView(this)
         setContentView(gameView)
+
+        // Enable edge-to-edge and immersive mode using Compat for all API levels
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+
+        // Handle insets for proper drawing under transient bars (optional but recommended for games)
+        ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { view, insets ->
+            // Your GameView can use insets if needed (e.g., padding); for full immersion, just pass through
+            ViewCompat.onApplyWindowInsets(view, insets)
+        }
+
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     }
 

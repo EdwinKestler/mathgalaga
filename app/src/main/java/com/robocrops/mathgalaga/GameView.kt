@@ -161,7 +161,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 }
             }
             val player = playerJoystickMap[deviceId] ?: return super.onGenericMotionEvent(event)
-            // Input debouncing: apply deadzone
+            // Input debouncing: apply dead-zone
             joystickX[player] = if (abs(event.getAxisValue(MotionEvent.AXIS_X)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_X) else 0f
             joystickY[player] = if (abs(event.getAxisValue(MotionEvent.AXIS_Y)) > 0.1f) -event.getAxisValue(MotionEvent.AXIS_Y) else 0f
             return true
