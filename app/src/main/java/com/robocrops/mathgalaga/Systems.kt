@@ -131,6 +131,7 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 val p = controller.world["player"]?.get(targetEid) as? Player ?: return@forEach
                 p.lives -= 1
                 controller.view.playHitSound()
+                createPlayerHitExplosion(targetEid)  // Added: Create explosion animation when player is hit by bullet
                 if (p.lives > 0) {
                     p.state = "respawning"
                     p.respawnTime = System.currentTimeMillis()
@@ -189,6 +190,93 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 }
             }
         }
+
+        // Added: Detect and handle player-alien crashes
+        // Only check active players against non-exploding aliens
+        val activePlayerEids = controller.playerEids.filter {
+            (controller.world["player"]?.get(it) as? Player)?.state == "active"
+        }
+        if (activePlayerEids.isNotEmpty() && alienEids.isNotEmpty()) {
+            val sortedPlayers = activePlayerEids.sortedBy { (controller.world["position"]?.get(it) as? Position)?.x ?: Float.MAX_VALUE }
+            var playerIndex = 0
+            sortedPlayers.forEach { pEid ->
+                val pPos = controller.world["position"]?.get(pEid) as? Position ?: return@forEach
+                val pSize = controller.world["size"]?.get(pEid) as? Size ?: return@forEach
+                val pRect = controller.getRect(pEid)
+
+                // Advance alienIndex to potential overlaps (reuse alienIndex but reset for each player)
+                alienIndex = 0
+                while (alienIndex < sortedAliens.size) {
+                    val aEidTemp = sortedAliens[alienIndex]
+                    val aPos = controller.world["position"]?.get(aEidTemp) as? Position ?: break
+                    val aSize = controller.world["size"]?.get(aEidTemp) as? Size ?: break
+                    if (aPos.x + aSize.width >= pPos.x) break
+                    alienIndex++
+                }
+
+                // Check overlapping aliens
+                for (j in alienIndex until sortedAliens.size) {
+                    val aEid = sortedAliens[j]
+                    if (controller.world["explosion"]?.containsKey(aEid) == true) continue
+                    val aPos = controller.world["position"]?.get(aEid) as? Position ?: continue
+                    val aSize = controller.world["size"]?.get(aEid) as? Size ?: continue
+                    if (aPos.x > pPos.x + pSize.width) break // No more overlaps
+                    val aRect = controller.getRect(aEid)
+                    if (Utils.collides(pRect, aRect)) {
+                        handlePlayerAlienCrash(pEid, aEid)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    // Added: Helper function to create explosion entity at player's position when hit
+    private fun createPlayerHitExplosion(playerEid: Int) {
+        val pos = controller.world["position"]?.get(playerEid) as? Position ?: return
+        val size = controller.world["size"]?.get(playerEid) as? Size ?: return
+        val now = System.currentTimeMillis()
+        val expEid = controller.newEntity()
+        controller.world.getOrPut("position") { mutableMapOf() }[expEid] = Position(pos.x, pos.y)
+        controller.world.getOrPut("size") { mutableMapOf() }[expEid] = size
+        controller.world.getOrPut("explosion") { mutableMapOf() }[expEid] = Explosion(now)
+        controller.world.getOrPut("lifespan") { mutableMapOf() }[expEid] = Lifespan(now, Config.PlayerHitSettings.EXPLOSION_DURATION)
+        controller.world.getOrPut("render") { mutableMapOf() }[expEid] = mapOf(
+            "type" to "explosion",
+            "color" to Config.PlayerHitSettings.EXPLOSION_COLOR,
+            "max_radius" to Config.PlayerHitSettings.EXPLOSION_MAX_RADIUS
+        )
+        controller.view.playExplosionSound()
+    }
+
+    // Added: Helper function to handle player-alien crash: deduct player life, explode both
+    private fun handlePlayerAlienCrash(playerEid: Int, alienEid: Int) {
+        val p = controller.world["player"]?.get(playerEid) as? Player ?: return
+        p.lives -= 1
+        controller.view.playHitSound()
+        createPlayerHitExplosion(playerEid)
+        if (p.lives > 0) {
+            p.state = "respawning"
+            p.respawnTime = System.currentTimeMillis()
+        } else {
+            p.state = "dead"
+        }
+
+        // Explode the alien (similar to bullet hit, but no score or streak since it's a crash)
+        val now = System.currentTimeMillis()
+        controller.world.getOrPut("explosion") { mutableMapOf() }[alienEid] = Explosion(now)
+        controller.world.getOrPut("lifespan") { mutableMapOf() }[alienEid] = Lifespan(now, Config.ExplosionSettings.DURATION)
+        controller.world["alien_movement"]?.remove(alienEid)
+        controller.world["shooter"]?.remove(alienEid)
+        controller.world["collider"]?.remove(alienEid)
+        controller.world["render"]?.set(
+            alienEid, mapOf(
+                "type" to "explosion",
+                "color" to Config.ColorSettings.YELLOW,
+                "max_radius" to 30
+            )
+        )
+        controller.view.playExplosionSound()
     }
 }
 
@@ -210,6 +298,16 @@ class LifespanSystem(controller: GameController) : BaseSystem(controller) {
                 p.state = "active"
                 val pos = controller.world["position"]?.get(eid) as? Position ?: return@forEach
                 pos.x = p.startX
+                // Added: Attach RespawnAura component to player after respawn for animation
+                controller.world.getOrPut("respawn_aura") { mutableMapOf() }[eid] = RespawnAura(now)
+            }
+        }
+
+        // Added: Remove RespawnAura after its duration
+        controller.world["respawn_aura"]?.forEach { (eid, raAny) ->
+            val ra = raAny as? RespawnAura ?: return@forEach
+            if (now - ra.start > Config.RespawnAuraSettings.DURATION) {
+                controller.world["respawn_aura"]?.remove(eid)
             }
         }
     }
@@ -268,11 +366,11 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
                     val exp = controller.world["explosion"]?.get(eid) as? Explosion ?: continue
                     val elapsed = System.currentTimeMillis() - exp.start
                     val radius = ((elapsed.toFloat() / Config.ExplosionSettings.DURATION) * (r["max_radius"] as? Int
-                        ?: 30)).toInt()
+                        ?: 30)).toFloat()  // Changed: Use toFloat() for drawCircle
                     val centerX = pos.x + size.width / 2
                     val centerY = pos.y + size.height / 2
                     val paint = Paint().apply { color = r["color"] as? Int ?: Config.ColorSettings.YELLOW }
-                    canvas.drawCircle(centerX, centerY, radius.toFloat(), paint)
+                    canvas.drawCircle(centerX, centerY, radius, paint)
                 }
                 "combo_text" -> {
                     val lifespan = controller.world["lifespan"]?.get(eid) as? Lifespan ?: continue
@@ -288,6 +386,24 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
                     // Draw the combo text
                     canvas.drawText(r["text"] as? String ?: "", pos.x, ypos, paint)
                 }
+            }
+
+            // Added: If entity is a player with RespawnAura, draw the aura animation around it
+            if (controller.playerEids.contains(eid) && controller.world["respawn_aura"]?.containsKey(eid) == true) {
+                val ra = controller.world["respawn_aura"]?.get(eid) as? RespawnAura ?: continue
+                val elapsed = System.currentTimeMillis() - ra.start
+                // Calculate current color: flash between colors
+                val colorIndex = ((elapsed / Config.RespawnAuraSettings.FLASH_INTERVAL) % Config.RespawnAuraSettings.COLORS.size).toInt()
+                val auraColor = Config.RespawnAuraSettings.COLORS[colorIndex]
+                val auraRadius = (size.width.coerceAtLeast(size.height) / 2f) * Config.RespawnAuraSettings.RADIUS_FACTOR
+                val centerX = pos.x + size.width / 2
+                val centerY = pos.y + size.height / 2
+                val paint = Paint().apply {
+                    color = auraColor
+                    style = Paint.Style.STROKE
+                    strokeWidth = 4f  // Thick stroke for visible aura
+                }
+                canvas.drawCircle(centerX, centerY, auraRadius, paint)
             }
         }
     }

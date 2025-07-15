@@ -220,3 +220,5 @@ class GameController(val context: Context, val view: GameView) {
         switchState("level_transition")
     }
 }
+
+// Note: No major code changes were needed in this file for the requested improvements (explosions on player hits/crashes, respawn aura, bigger retro fonts). The logic for explosions and aura is handled in Systems.kt (CollisionSystem, LifespanSystem, RenderingSystem), and font changes are in Config.kt. This file remains as is, with the systems integrating the new features via the world ECS.

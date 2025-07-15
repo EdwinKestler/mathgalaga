@@ -2,6 +2,7 @@ package com.robocrops.mathgalaga
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.Color.argb
 import kotlin.random.Random
 import androidx.core.graphics.createBitmap
 import com.robocrops.mathgalaga.R  // Import for direct R.drawable access
@@ -15,16 +16,16 @@ object Config {
 
     object FontSettings {
         val MAIN: Paint = Paint().apply {
-            textSize = 30f
+            textSize = 48f  // Changed: Increased from 30f to 48f for bigger math questions and better visibility
             color = Color.WHITE
-            typeface = Typeface.DEFAULT
-            isAntiAlias = true
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)  // Changed: Set to monospace bold to imitate 8-bit retro bold font
+            isAntiAlias = false  // Changed: Set to false for pixelated retro look without custom font
         }
         val COMBO: Paint = Paint().apply {
-            textSize = 24f
+            textSize = 36f  // Changed: Increased from 24f to 36f for consistency with MAIN font scaling
             color = Color.YELLOW
-            typeface = Typeface.DEFAULT_BOLD
-            isAntiAlias = true
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)  // Changed: Set to monospace bold to imitate 8-bit retro bold font
+            isAntiAlias = false  // Changed: Set to false for pixelated retro look
         }
     }
 
@@ -35,6 +36,9 @@ object Config {
         const val GREEN = Color.GREEN
         const val RED = Color.RED
         const val BLUE = Color.BLUE
+        const val AURA_GREEN = -2147418368  // Added: Semi-transparent green for respawn aura effect (equivalent to Color.argb(128, 0, 255, 0))        const val AURA_CYAN = argb(128, 0, 255, 255)  // Added: Semi-transparent cyan as alternative for aura
+        const val AURA_CYAN = -2147418113  // Added: Semi-transparent cyan as alternative for aura (equivalent to Color.argb(128, 0, 255, 255))
+
     }
 
     object PlayerSettings {
@@ -43,6 +47,21 @@ object Config {
         const val SPEED = 8 // px per frame
         const val LIVES = 3
         const val RESPAWN_DURATION = 1000L // ms
+    }
+
+    // Added: New settings for player hit effects, including explosions when hit or crashing
+    object PlayerHitSettings {
+        const val EXPLOSION_DURATION = 500L  // ms for hit explosion animation
+        const val EXPLOSION_MAX_RADIUS = 40  // Max radius for player hit explosion
+        const val EXPLOSION_COLOR = ColorSettings.RED  // Color for player hit explosion
+    }
+
+    // Added: New settings for respawn aura animation to indicate new ship
+    object RespawnAuraSettings {
+        const val DURATION = 1500L  // ms for aura effect after respawn
+        const val RADIUS_FACTOR = 1.5f  // Multiplier for aura radius based on player size
+        val COLORS = listOf(ColorSettings.AURA_GREEN, ColorSettings.AURA_CYAN)  // Colors for flashing aura (can alternate)
+        const val FLASH_INTERVAL = 250L  // ms between color flashes in aura
     }
 
     object AlienSettings {

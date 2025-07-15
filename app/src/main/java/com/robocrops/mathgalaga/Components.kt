@@ -13,3 +13,7 @@ data class Bullet(val ownerEid: Int)
 data class Explosion(val start: Long)
 data class Lifespan(val start: Long, val duration: Long)
 data class FloatUp(val speed: Int)
+
+// Added: New component for respawn aura animation to indicate a new ship after hit
+// This will be attached to the player entity after respawn, and removed after duration
+data class RespawnAura(val start: Long)

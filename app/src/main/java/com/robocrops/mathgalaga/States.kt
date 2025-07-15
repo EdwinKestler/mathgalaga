@@ -248,3 +248,5 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
         )
     }
 }
+
+// Note: No code changes were needed in this file for the requested improvements (explosions on player hits/crashes, respawn aura, bigger retro fonts). The bigger retro fonts from Config.kt will automatically apply to all text drawn in the states (e.g., HUD in PlayingState, messages in other states). Explosions and aura are handled and rendered via the ECS systems (CollisionSystem, LifespanSystem, RenderingSystem) during PlayingState.
