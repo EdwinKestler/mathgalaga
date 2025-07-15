@@ -53,6 +53,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val lastFireTime = LongArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
+    val playerFireButtonMap = mutableMapOf<Int, Int>() // deviceId to playerIndex for firing
 
     // Calibration mode
     var calibratingPlayer: Int = -1
@@ -309,6 +310,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onInputDeviceRemoved(deviceId: Int) {
         playerJoystickMap.remove(deviceId)
+        playerFireButtonMap.remove(deviceId)
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
