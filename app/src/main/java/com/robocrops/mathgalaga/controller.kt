@@ -476,10 +476,15 @@ class WinState(controller: GameController) : BaseState(controller) {
 
 // Add this new state
 class CalibrationState(controller: GameController) : BaseState(controller) {
-    private var currentStep = 0 // 0: P1 move, 1: P2 move, 2: P1 fire, 3: P2 fire
-    private var pauseStartTime: Long = 0L
-    private var isPausing = false
+    private var currentStep = 0
+    private val messages = listOf(
+        "Player 1: Move joystick",
+        "Player 2: Move joystick",
+        "Player 1: Press fire button",
+        "Player 2: Press fire button"
+    )
 
+    private var isPausing = false
     private val handler = Handler(Looper.getMainLooper())
 
     init {
@@ -487,7 +492,7 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
     }
 
     private fun setupCalibration() {
-        val player = if (currentStep == 0 || currentStep == 2) 0 else 1
+        val player = if (currentStep % 4 < 2) currentStep % 2 else currentStep % 2
         controller.view.setCalibratingPlayer(player)
         controller.view.startCalibration { deviceId, calibratedPlayer, isFire ->
             if (isFire) {
@@ -495,40 +500,37 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
             } else {
                 controller.view.playerJoystickMap[deviceId] = calibratedPlayer
             }
-            Log.d("MathGalaga", "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)")
-            startPause()
+            Log.d(
+                "MathGalaga",
+                "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)"
+            )
+            controller.view.setCalibratingPlayer(-1)
+            isPausing = true
+            handler.postDelayed({ advanceStep() }, 1500)
         }
     }
 
-    private fun startPause() {
-        isPausing = true
-        pauseStartTime = System.currentTimeMillis()
-        controller.view.setCalibratingPlayer(-1) // Ignore inputs during pause
-        handler.postDelayed({
-            isPausing = false
-            currentStep++
-            if (currentStep > 3) {
-                controller.view.endCalibration()
-                controller.switchState("level_transition")
-            } else {
-                controller.view.setCalibratingPlayer(if (currentStep == 0 || currentStep == 2) 0 else 1)
-                setupCalibration() // Reset listener for next step
-            }
-        }, 2000)
+    private fun advanceStep() {
+        isPausing = false
+        currentStep++
+        if (currentStep >= messages.size) {
+            controller.view.endCalibration()
+            controller.switchState("level_transition")
+        } else {
+            setupCalibration()
+        }
     }
 
     override fun update(delta: Double) {
-        if (isPausing) return
+        // No-op
     }
 
     override fun draw(canvas: Canvas) {
         canvas.drawColor(Config.ColorSettings.BLACK)
-        val msg = if (isPausing) "Calibrated! Preparing next step..." else when (currentStep) {
-            0 -> "Player 1: Move your joystick"
-            1 -> "Player 2: Move your joystick"
-            2 -> "Player 1: Press fire button"
-            3 -> "Player 2: Press fire button"
-            else -> ""
+        val msg = if (isPausing) {
+            "Calibrated! Preparing next step..."
+        } else {
+            messages[currentStep]
         }
         val paint = Config.FontSettings.MAIN
         val bounds = Rect()
