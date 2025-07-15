@@ -328,6 +328,15 @@ class BoundsSystem(controller: GameController) : BaseSystem(controller) {
 }
 
 class RenderingSystem(controller: GameController) : BaseSystem(controller) {
+    // Added: Reusable Paint objects to minimize allocations in draw loop
+    private val rectPaint = Paint()
+    private val explosionPaint = Paint()
+    private val auraPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
+    private val textBounds = Rect()  // Reusable Rect for text bounds
+
     override fun update(delta: Double) {}
 
     fun draw(canvas: Canvas) {
@@ -342,8 +351,8 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
             val size = controller.world["size"]?.get(eid) as? Size ?: Size(0, 0)
             when (r["type"]) {
                 "rect" -> {
-                    val paint = Paint().apply { color = r["color"] as? Int ?: Config.ColorSettings.WHITE }
-                    canvas.drawRect(controller.getRect(eid), paint)
+                    rectPaint.color = r["color"] as? Int ?: Config.ColorSettings.WHITE  // Changed: Reuse rectPaint
+                    canvas.drawRect(controller.getRect(eid), rectPaint)
                 }
                 "sprite" -> {
                     val image = r["image"] as? Bitmap ?: continue
@@ -355,10 +364,9 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
                     val text = r["text"] as? String
                     if (!text.isNullOrEmpty()) {
                         val paint = Config.FontSettings.MAIN
-                        val bounds = Rect()
-                        paint.getTextBounds(text, 0, text.length, bounds)
-                        val centerX = pos.x + size.width / 2 - bounds.width() / 2
-                        val centerY = pos.y + size.height / 2 + bounds.height() / 2
+                        paint.getTextBounds(text, 0, text.length, textBounds)  // Changed: Reuse textBounds
+                        val centerX = pos.x + size.width / 2 - textBounds.width() / 2
+                        val centerY = pos.y + size.height / 2 + textBounds.height() / 2
                         canvas.drawText(text, centerX, centerY, paint)
                     }
                 }
@@ -369,8 +377,8 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
                         ?: 30)).toFloat()  // Changed: Use toFloat() for drawCircle
                     val centerX = pos.x + size.width / 2
                     val centerY = pos.y + size.height / 2
-                    val paint = Paint().apply { color = r["color"] as? Int ?: Config.ColorSettings.YELLOW }
-                    canvas.drawCircle(centerX, centerY, radius, paint)
+                    explosionPaint.color = r["color"] as? Int ?: Config.ColorSettings.YELLOW  // Changed: Reuse explosionPaint
+                    canvas.drawCircle(centerX, centerY, radius, explosionPaint)
                 }
                 "combo_text" -> {
                     val lifespan = controller.world["lifespan"]?.get(eid) as? Lifespan ?: continue
@@ -398,12 +406,8 @@ class RenderingSystem(controller: GameController) : BaseSystem(controller) {
                 val auraRadius = (size.width.coerceAtLeast(size.height) / 2f) * Config.RespawnAuraSettings.RADIUS_FACTOR
                 val centerX = pos.x + size.width / 2
                 val centerY = pos.y + size.height / 2
-                val paint = Paint().apply {
-                    color = auraColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = 4f  // Thick stroke for visible aura
-                }
-                canvas.drawCircle(centerX, centerY, auraRadius, paint)
+                auraPaint.color = auraColor  // Changed: Reuse auraPaint
+                canvas.drawCircle(centerX, centerY, auraRadius, auraPaint)
             }
         }
     }
