@@ -197,10 +197,15 @@ class CalibrationState(controller: GameController) : BaseState(controller) {
                 Log.d("MathGalaga", "Wrong input type for step $currentStep (isFire: $isFire), ignoring")
                 return@startCalibration
             }
-            if (deviceId != controller.view.playerDeviceIds[calibratedPlayer]) {
-                Log.d("MathGalaga", "Wrong device $deviceId for player $calibratedPlayer (expected ${controller.view.playerDeviceIds[calibratedPlayer]}), ignoring")
+
+            // During calibration we intentionally learn device-to-player mapping dynamically.
+            val otherPlayer = if (calibratedPlayer == 0) 1 else 0
+            if (controller.view.playerDeviceIds[otherPlayer] == deviceId) {
+                Log.d("MathGalaga", "Device $deviceId is already assigned to player $otherPlayer, ignoring")
                 return@startCalibration
             }
+
+            controller.view.playerDeviceIds[calibratedPlayer] = deviceId
             Log.d(
                 "MathGalaga",
                 "Calibrated device $deviceId for player $calibratedPlayer (isFire: $isFire)"
