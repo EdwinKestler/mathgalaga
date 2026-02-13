@@ -62,7 +62,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val lastFireTime = LongArray(2)
 
     val playerJoystickMap = mutableMapOf<Int, Int>() // deviceId to playerIndex (0 or 1)
-    val playerDeviceIds = intArrayOf(9, 5) // player 0 (red): device 9, player 1 (blue): device 5
+    val playerDeviceIds = intArrayOf(-1, -1)
 
     // Calibration mode
     var calibratingPlayer: Int = -1
@@ -134,14 +134,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val inputManager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
         inputManager.registerInputDeviceListener(this, null)
 
-        // Scan existing devices and assign based on specific IDs
-        for (deviceId in inputManager.inputDeviceIds) {
-            onInputDeviceAdded(deviceId)
-        }
-
-        // Hardcode assignments in case not added yet
-        playerJoystickMap[playerDeviceIds[0]] = 0
-        playerJoystickMap[playerDeviceIds[1]] = 1
+        // Scan already-connected devices and auto-assign player slots.
+        autoAssignConnectedJoysticks()
 
         controller = GameController(context, this)
         // Changed: Move initSounds() to surfaceCreated and make it async
@@ -222,6 +216,39 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     fun setCalibratingPlayer(player: Int) {
         calibratingPlayer = player
+    }
+
+    private fun isGameController(device: InputDevice): Boolean {
+        val hasJoystick = device.sources and InputDevice.SOURCE_JOYSTICK != 0
+        val hasGamepad = device.sources and InputDevice.SOURCE_GAMEPAD != 0
+        return (hasJoystick || hasGamepad) && !device.isVirtual
+    }
+
+    private fun assignDeviceToPlayer(deviceId: Int, player: Int) {
+        playerJoystickMap.entries.removeIf { it.value == player }
+        playerJoystickMap[deviceId] = player
+        playerDeviceIds[player] = deviceId
+    }
+
+    private fun autoAssignConnectedJoysticks() {
+        val inputManager = context.getSystemService(Context.INPUT_SERVICE) as InputManager
+        val gameDevices = inputManager.inputDeviceIds
+            .mapNotNull { id -> InputDevice.getDevice(id) }
+            .filter(::isGameController)
+            // ID is not stable across boots, so sort by descriptor/name for deterministic startup assignment.
+            .sortedWith(compareBy<InputDevice> { it.descriptor ?: "" }.thenBy { it.name }.thenBy { it.id })
+
+        val player0 = gameDevices.getOrNull(0)
+        val player1 = gameDevices.getOrNull(1)
+
+        playerJoystickMap.clear()
+        playerDeviceIds[0] = -1
+        playerDeviceIds[1] = -1
+
+        player0?.let { assignDeviceToPlayer(it.id, 0) }
+        player1?.let { assignDeviceToPlayer(it.id, 1) }
+
+        Log.d("MathGalaga", "Auto-assign result: P1=${playerDeviceIds[0]}, P2=${playerDeviceIds[1]}")
     }
 
     /**
@@ -323,21 +350,36 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     override fun onInputDeviceAdded(deviceId: Int) {
         val device = InputDevice.getDevice(deviceId) ?: return
-        val hasJoystick = device.sources and InputDevice.SOURCE_JOYSTICK != 0
-        val hasGamepad = device.sources and InputDevice.SOURCE_GAMEPAD != 0
-        if (hasJoystick || hasGamepad) {
-            if (deviceId == playerDeviceIds[0]) {
-                playerJoystickMap[deviceId] = 0
+        if (!isGameController(device)) return
+
+        when {
+            playerDeviceIds[0] == -1 -> {
+                assignDeviceToPlayer(deviceId, 0)
                 Log.d("MathGalaga", "Assigned joystick device $deviceId (${device.name}) to player 0")
-            } else if (deviceId == playerDeviceIds[1]) {
-                playerJoystickMap[deviceId] = 1
+            }
+
+            playerDeviceIds[1] == -1 && deviceId != playerDeviceIds[0] -> {
+                assignDeviceToPlayer(deviceId, 1)
                 Log.d("MathGalaga", "Assigned joystick device $deviceId (${device.name}) to player 1")
+            }
+
+            else -> {
+                Log.d("MathGalaga", "Joystick device $deviceId (${device.name}) connected but both player slots are occupied")
             }
         }
     }
 
     override fun onInputDeviceRemoved(deviceId: Int) {
-        playerJoystickMap.remove(deviceId)
+        val removedPlayer = playerJoystickMap.remove(deviceId)
+        if (removedPlayer != null) {
+            playerDeviceIds[removedPlayer] = -1
+            joystickX[removedPlayer] = 0f
+            joystickY[removedPlayer] = 0f
+            firePressed[removedPlayer] = false
+            fireButtonWasPressed[removedPlayer] = false
+            Log.d("MathGalaga", "Joystick for player $removedPlayer disconnected, attempting re-assignment")
+            autoAssignConnectedJoysticks()
+        }
     }
 
     override fun onInputDeviceChanged(deviceId: Int) {
