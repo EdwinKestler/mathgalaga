@@ -9,6 +9,30 @@ import com.robocrops.mathgalaga.R  // Import for direct R.drawable access
 
 object Config {
 
+    enum class GradeBand { G1_2, G3_4, G5_PLUS }
+
+    enum class MultiplayerMode { SINGLE_PLAYER, COOP_SHARED, COOP_INDEPENDENT }
+
+    data class GradeBandSettings(
+        val levelBounds: Map<Int, Pair<Int, Int>>,
+        val alienBaseSpeed: Int,
+        val alienShootChance: Double,
+        val alienShootIntervalMs: Long,
+        val maxBullets: Int,
+        val topTargetCount: Int,
+        val lowerEnemyMin: Int,
+        val lowerEnemyMax: Int,
+        val scoreCorrect: Int,
+        val speedBonusMax: Int,
+        val wrongTopPenalty: Int,
+        val hintWrongAttempts: Int,
+        val hintTimeoutMs: Long,
+        val speedTargetMs: Long,
+        val upThreshold: Float,
+        val downThreshold: Float,
+        val hintsEnabledByDefault: Boolean
+    )
+
     object ScreenSettings {
         var WIDTH: Int = 800
         var HEIGHT: Int = 600
@@ -36,7 +60,7 @@ object Config {
         const val GREEN = Color.GREEN
         const val RED = Color.RED
         const val BLUE = Color.BLUE
-        const val AURA_GREEN = -2147418368  // Added: Semi-transparent green for respawn aura effect (equivalent to Color.argb(128, 0, 255, 0))        const val AURA_CYAN = argb(128, 0, 255, 255)  // Added: Semi-transparent cyan as alternative for aura
+        const val AURA_GREEN = -2147418368  // Added: Semi-transparent green for respawn aura effect (equivalent to Color.argb(128, 0, 255, 0))
         const val AURA_CYAN = -2147418113  // Added: Semi-transparent cyan as alternative for aura (equivalent to Color.argb(128, 0, 255, 255))
 
     }
@@ -87,13 +111,12 @@ object Config {
 
     object DifficultySettings {
         const val WINDOW = 10
-        // Map: level (1-based) -> inclusive range (lo..hi)
-        val LEVELS: Map<Int, Pair<Int, Int>> = mapOf(
-            1 to (1 to 5),
-            2 to (1 to 10),
+        val DEFAULT_LEVELS: Map<Int, Pair<Int, Int>> = mapOf(
+            1 to (1 to 12),
+            2 to (1 to 12),
             3 to (1 to 20),
-            4 to (1 to 50),
-            5 to (5 to 50)
+            4 to (1 to 20),
+            5 to (1 to 20)
         )
     }
 
@@ -108,6 +131,73 @@ object Config {
     object GameSettings {
         const val MAX_LEVEL = 5
     }
+
+    val GRADE_BAND_PRESETS: Map<GradeBand, GradeBandSettings> = mapOf(
+        GradeBand.G1_2 to GradeBandSettings(
+            levelBounds = mapOf(1 to (1 to 5), 2 to (1 to 5), 3 to (1 to 10), 4 to (1 to 10), 5 to (1 to 10)),
+            alienBaseSpeed = 1,
+            alienShootChance = 0.0025,
+            alienShootIntervalMs = 2600L,
+            maxBullets = 12,
+            topTargetCount = 4,
+            lowerEnemyMin = 6,
+            lowerEnemyMax = 8,
+            scoreCorrect = 10,
+            speedBonusMax = 5,
+            wrongTopPenalty = 3,
+            hintWrongAttempts = 2,
+            hintTimeoutMs = 8_000L,
+            speedTargetMs = 9_000L,
+            upThreshold = 0.75f,
+            downThreshold = 0.50f,
+            hintsEnabledByDefault = true
+        ),
+        GradeBand.G3_4 to GradeBandSettings(
+            levelBounds = mapOf(1 to (1 to 12), 2 to (1 to 12), 3 to (1 to 20), 4 to (1 to 20), 5 to (1 to 20)),
+            alienBaseSpeed = 2,
+            alienShootChance = 0.004,
+            alienShootIntervalMs = 2200L,
+            maxBullets = 16,
+            topTargetCount = 5,
+            lowerEnemyMin = 10,
+            lowerEnemyMax = 14,
+            scoreCorrect = 12,
+            speedBonusMax = 8,
+            wrongTopPenalty = 4,
+            hintWrongAttempts = 3,
+            hintTimeoutMs = 10_000L,
+            speedTargetMs = 7_000L,
+            upThreshold = 0.80f,
+            downThreshold = 0.50f,
+            hintsEnabledByDefault = true
+        ),
+        GradeBand.G5_PLUS to GradeBandSettings(
+            levelBounds = mapOf(1 to (1 to 20), 2 to (1 to 20), 3 to (1 to 20), 4 to (5 to 50), 5 to (5 to 50)),
+            alienBaseSpeed = 3,
+            alienShootChance = 0.006,
+            alienShootIntervalMs = 1800L,
+            maxBullets = 20,
+            topTargetCount = 6,
+            lowerEnemyMin = 14,
+            lowerEnemyMax = 20,
+            scoreCorrect = 15,
+            speedBonusMax = 10,
+            wrongTopPenalty = 5,
+            hintWrongAttempts = 3,
+            hintTimeoutMs = 12_000L,
+            speedTargetMs = 5_500L,
+            upThreshold = 0.85f,
+            downThreshold = 0.55f,
+            hintsEnabledByDefault = false
+        )
+    )
+
+    var currentGradeBand: GradeBand = GradeBand.G3_4
+    var multiplayerMode: MultiplayerMode = MultiplayerMode.COOP_SHARED
+
+    fun currentBandSettings(): GradeBandSettings =
+        GRADE_BAND_PRESETS[currentGradeBand]
+            ?: error("Missing grade-band settings for $currentGradeBand")
 
     /** Randomly generated background star positions */
     val starsPositions: List<Pair<Int, Int>> by lazy {

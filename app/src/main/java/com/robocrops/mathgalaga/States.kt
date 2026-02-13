@@ -20,13 +20,21 @@ class PlayingState(controller: GameController) : BaseState(controller) {
         controller.lifespanSystem.update(delta)
         controller.boundsSystem.update(delta)
         // Level advance
-        if (controller.playerEids.all {
+        val shouldAdvance = when (Config.multiplayerMode) {
+            Config.MultiplayerMode.COOP_INDEPENDENT -> controller.playerEids.any {
                 (controller.world["player"]?.get(it) as? Player)?.clearedTop ?: false
-            }) {
+            }
+            else -> controller.playerEids.all {
+                (controller.world["player"]?.get(it) as? Player)?.clearedTop ?: false
+            }
+        }
+        if (shouldAdvance) {
             controller.playerEids.forEach { eid ->
                 val p = controller.world["player"]?.get(eid) as? Player ?: return@forEach
                 p.clearedTop = false
                 p.problem = generateAdaptiveProblem(p.dm)
+                p.currentProblemStartMs = System.currentTimeMillis()
+                p.wrongAttemptsOnCurrentProblem = 0
             }
             controller.level++
             if (controller.level > Config.GameSettings.MAX_LEVEL) {
@@ -36,9 +44,15 @@ class PlayingState(controller: GameController) : BaseState(controller) {
             }
         }
         // Check for player death
-        if (controller.playerEids.any {
+        val shouldGameOver = when (Config.multiplayerMode) {
+            Config.MultiplayerMode.COOP_INDEPENDENT -> controller.playerEids.all {
+                ((controller.world["player"]?.get(it) as? Player)?.lives ?: 0) <= 0
+            }
+            else -> controller.playerEids.any {
                 ((controller.world["player"]?.get(it) as? Player)?.lives ?: 1) <= 0
-            }) {
+            }
+        }
+        if (shouldGameOver) {
             controller.switchState("game_over")
         }
     }
@@ -57,6 +71,14 @@ class PlayingState(controller: GameController) : BaseState(controller) {
             canvas.drawText((p.problem["question"] as? String) ?: "", x0, 30f, Config.FontSettings.MAIN)
             canvas.drawText("P${i + 1} Score:${p.score.toInt()}", x0, 70f, Config.FontSettings.MAIN)
             canvas.drawText("P${i + 1} Lives:${p.lives}", x0, 110f, Config.FontSettings.MAIN)
+            val attempts = p.correctCount + p.wrongCount
+            val acc = if (attempts == 0) 100 else ((p.correctCount * 100.0) / attempts).toInt()
+            val lastTime = if (p.lastSolveMs <= 0L) "--" else "%.1fs".format(p.lastSolveMs / 1000.0)
+            canvas.drawText("Acc:$acc% Time:$lastTime", x0, 150f, Config.FontSettings.MAIN)
+        }
+        val activeHint = controller.world["hint"]?.values?.firstOrNull() as? Hint
+        if (activeHint != null) {
+            canvas.drawText(activeHint.message, 20f, Config.ScreenSettings.HEIGHT - 30f, Config.FontSettings.MAIN)
         }
         val lvlTxt = "Level:${controller.level}"
         val bounds = Rect()
