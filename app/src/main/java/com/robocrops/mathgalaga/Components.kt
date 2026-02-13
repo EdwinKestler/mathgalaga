@@ -7,12 +7,29 @@ data class Size(val width: Int, val height: Int)
 data class Velocity(val vx: Int, val vy: Int)
 data class AlienMovement(var speed: Int, var direction: Int)
 data class Shooter(var interval: Long, var lastShot: Long, var chance: Double?, var bulletSpeed: Int)
-data class Player(var color: Int, var dm: DifficultyManager, var lives: Int, var score: Double, var problem: Map<String, Any>, var streak: Int, var state: String, var respawnTime: Long, var clearedTop: Boolean, var startX: Float)
+data class Player(
+    var color: Int,
+    var dm: DifficultyManager,
+    var lives: Int,
+    var score: Double,
+    var problem: Map<String, Any>,
+    var streak: Int,
+    var state: String,
+    var respawnTime: Long,
+    var clearedTop: Boolean,
+    var startX: Float,
+    var currentProblemStartMs: Long,
+    var wrongAttemptsOnCurrentProblem: Int,
+    var correctCount: Int,
+    var wrongCount: Int,
+    var lastSolveMs: Long
+)
 data class Alien(val number: Int?, val shape: String)
 data class Bullet(val ownerEid: Int)
 data class Explosion(val start: Long)
 data class Lifespan(val start: Long, val duration: Long)
 data class FloatUp(val speed: Int)
+data class Hint(val message: String, val start: Long, val duration: Long)
 
 // Added: New component for respawn aura animation to indicate a new ship after hit
 // This will be attached to the player entity after respawn, and removed after duration

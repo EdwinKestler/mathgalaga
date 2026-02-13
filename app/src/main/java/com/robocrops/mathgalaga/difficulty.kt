@@ -25,10 +25,11 @@ class DifficultyManager {
         // Only adjust when window is full
         if (window.size == Config.DifficultySettings.WINDOW) {
             val acc = window.count { it }.toFloat() / window.size
-            val levelsCount = Config.DifficultySettings.LEVELS.size
-            if (acc > 0.8f && level < levelsCount) {
+            val settings = Config.currentBandSettings()
+            val levelsCount = settings.levelBounds.size
+            if (acc >= settings.upThreshold && level < levelsCount) {
                 level++
-            } else if (acc < 0.5f && level > 1) {
+            } else if (acc < settings.downThreshold && level > 1) {
                 level--
             }
             // Clamp for safety
@@ -40,9 +41,10 @@ class DifficultyManager {
      * Get current bounds for random math problems.
      */
     fun bounds(): Pair<Int, Int> =
-        Config.DifficultySettings.LEVELS[level]
-            ?: Config.DifficultySettings.LEVELS[1]
-            ?: (1 to 5)
+        Config.currentBandSettings().levelBounds[level]
+            ?: Config.currentBandSettings().levelBounds[1]
+            ?: Config.DifficultySettings.DEFAULT_LEVELS[1]
+            ?: (1 to 12)
 }
 
 /**

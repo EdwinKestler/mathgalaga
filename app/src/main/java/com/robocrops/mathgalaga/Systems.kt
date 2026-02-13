@@ -145,8 +145,13 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 val a = controller.world["alien"]?.get(targetEid) as? Alien ?: return@forEach
                 var canKill = true
                 if (a.number != null) {
-                    if (a.number != (p.problem["answer"] as? Int) || p.clearedTop)
+                    if (a.number != (p.problem["answer"] as? Int) || p.clearedTop) {
                         canKill = false
+                        p.wrongCount += 1
+                        p.wrongAttemptsOnCurrentProblem += 1
+                        p.dm.record(false)
+                        p.score -= Config.currentBandSettings().wrongTopPenalty
+                    }
                 }
                 if (!canKill) return@forEach
                 // Kill alien
@@ -167,10 +172,19 @@ class CollisionSystem(controller: GameController) : BaseSystem(controller) {
                 if (a.number == null) {
                     p.score += 1.0
                 } else {
+                    val nowMs = System.currentTimeMillis()
+                    val solveMs = (nowMs - p.currentProblemStartMs).coerceAtLeast(0L)
+                    val settings = Config.currentBandSettings()
+                    val speedRatio = (settings.speedTargetMs - solveMs).toDouble() / settings.speedTargetMs.toDouble()
+                    val speedBonus = (settings.speedBonusMax * speedRatio).coerceIn(0.0, settings.speedBonusMax.toDouble())
                     p.clearedTop = true
                     p.streak += 1
-                    val bonus = 1 + 0.1 * p.streak
-                    p.score += bonus
+                    val streakBonus = (0.5 * p.streak)
+                    p.score += settings.scoreCorrect + speedBonus + streakBonus
+                    p.correctCount += 1
+                    p.lastSolveMs = solveMs
+                    p.currentProblemStartMs = nowMs
+                    p.wrongAttemptsOnCurrentProblem = 0
                     val pos = controller.world["position"]?.get(targetEid) as? Position ?: return@forEach
                     val comboEid = controller.newEntity()
                     controller.world["position"]?.set(comboEid, Position(pos.x, pos.y))
@@ -312,6 +326,32 @@ class LifespanSystem(controller: GameController) : BaseSystem(controller) {
             }
         }
         auraToRemove.forEach { controller.world["respawn_aura"]?.remove(it) }
+
+        val hintToRemove = mutableListOf<Int>()
+        controller.world["hint"]?.forEach { (eid, hAny) ->
+            val h = hAny as? Hint ?: return@forEach
+            if (now - h.start > h.duration) {
+                hintToRemove.add(eid)
+            }
+        }
+        hintToRemove.forEach { controller.world["hint"]?.remove(it) }
+
+        // Hint logic
+        val settings = Config.currentBandSettings()
+        if (settings.hintsEnabledByDefault) {
+            controller.world["player"]?.forEach { (_, pAny) ->
+                val p = pAny as? Player ?: return@forEach
+                if (p.clearedTop) return@forEach
+                val elapsed = now - p.currentProblemStartMs
+                val shouldShowHint = p.wrongAttemptsOnCurrentProblem >= settings.hintWrongAttempts || elapsed >= settings.hintTimeoutMs
+                if (shouldShowHint && (controller.world["hint"]?.isEmpty() != false)) {
+                    val hintEid = controller.newEntity()
+                    val hintText = if (Random.nextBoolean()) "Use doubles: 6×7 = 6×6 + 6" else "Break apart: 8×7 = 8×5 + 8×2"
+                    controller.world.getOrPut("hint") { mutableMapOf() }[hintEid] = Hint(hintText, now, 3000L)
+                }
+            }
+        }
+
     }
 }
 
