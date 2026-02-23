@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.util.Log
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.random.Random
 
 class GameController(val context: Context, val view: GameView) {
@@ -40,18 +38,18 @@ class GameController(val context: Context, val view: GameView) {
         playerEids.add(newEntity())
         playerEids.add(newEntity())
         setupPlayers()
-        currentState = CalibrationState(this) // Start here instead of LevelTransitionState
+        currentState = CalibrationState(this)
     }
 
     fun isEndState(): Boolean = currentState is GameOverState || currentState is WinState
 
     private fun setupPlayers() {
-        val dm1 = DifficultyManager()
-        val dm2 = DifficultyManager()
         val colors = listOf(Config.ColorSettings.RED, Config.ColorSettings.BLUE)
         val startXs = listOf(100f, 600f)
         val sprites = listOf(Config.playerRedSprite, Config.playerBlueSprite)
+        val now = System.currentTimeMillis()
         playerEids.forEachIndexed { i, eid ->
+            val dm = DifficultyManager()
             val sprite = sprites[i]
             val size = Size(sprite.width, sprite.height)
             world.getOrPut("position") { mutableMapOf() }[eid] =
@@ -59,29 +57,24 @@ class GameController(val context: Context, val view: GameView) {
             world.getOrPut("size") { mutableMapOf() }[eid] = size
             world.getOrPut("player") { mutableMapOf() }[eid] = Player(
                 colors[i],
-                if (i == 0) dm1 else dm2,
+                dm,
                 Config.PlayerSettings.LIVES,
                 0.0,
-                generateAdaptiveProblem(if (i == 0) dm1 else dm2),
+                generateAdaptiveProblem(dm),
                 0,
                 "active",
                 0L,
                 false,
-                startXs[i]
+                startXs[i],
+                now,
+                0,
+                0,
+                0,
+                0L
             )
-            world.getOrPut("player_movement") { mutableMapOf() }[eid] =
-                mapOf("speed" to Config.PlayerSettings.SPEED) // Keep as map for simplicity
-            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(
-                500L,
-                0L,
-                null,
-                Config.BulletSettings.PLAYER_SPEED
-            )
-            world.getOrPut("render") { mutableMapOf() }[eid] = mapOf(
-                "type" to "sprite",
-                "image" to sprite,
-                "text" to null
-            )
+            world.getOrPut("player_movement") { mutableMapOf() }[eid] = mapOf("speed" to Config.PlayerSettings.SPEED)
+            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(500L, 0L, null, Config.BulletSettings.PLAYER_SPEED)
+            world.getOrPut("render") { mutableMapOf() }[eid] = mapOf("type" to "sprite", "image" to sprite, "text" to null)
             world.getOrPut("collider") { mutableMapOf() }[eid] = true
         }
     }
@@ -99,55 +92,40 @@ class GameController(val context: Context, val view: GameView) {
     }
 
     fun setupLevel() {
-        // Remove all non-player entities
         world["position"]?.keys?.filter { !playerEids.contains(it) }?.toList()?.forEach { removeEntity(it) }
 
-        val shape =
-            Config.AlienSettings.SHAPE_TYPES[(level - 1) % Config.AlienSettings.SHAPE_TYPES.size]
-        val speed = Config.AlienSettings.BASE_SPEED + (level - 1)
+        val settings = Config.currentBandSettings()
+        val shape = Config.AlienSettings.SHAPE_TYPES[(level - 1) % Config.AlienSettings.SHAPE_TYPES.size]
+        val speed = settings.alienBaseSpeed + (level - 1)
         val answers = playerEids.map {
             ((world["player"]?.get(it) as? Player)?.problem?.get("answer") as? Int) ?: 1
         }
-        val distractors = List(3) { Random.nextInt(1, 100) }
-        val nums = (answers + distractors).shuffled()
+        val distractors = generateDistractors(answers.firstOrNull() ?: 1, Config.currentGradeBand)
+        val nums = (answers + distractors).distinct().shuffled().take(settings.topTargetCount)
 
-        // Place top aliens (numbered)
-        getTopFormationPositions(level).forEachIndexed { i, (x, y) ->
+        getTopFormationPositions(level, settings.topTargetCount).forEachIndexed { i, (x, y) ->
             val valNum = nums.getOrNull(i) ?: Random.nextInt(1, 100)
             val eid = newEntity()
             val image = Config.alienTopSprites[shape]!!
             world.getOrPut("position") { mutableMapOf() }[eid] = Position(x, y)
             world.getOrPut("size") { mutableMapOf() }[eid] = Size(image.width, image.height)
-            world.getOrPut("render") { mutableMapOf() }[eid] =
-                mapOf("type" to "sprite", "image" to image, "text" to valNum.toString())
+            world.getOrPut("render") { mutableMapOf() }[eid] = mapOf("type" to "sprite", "image" to image, "text" to valNum.toString())
             world.getOrPut("alien") { mutableMapOf() }[eid] = Alien(valNum, shape)
-            world.getOrPut("alien_movement") { mutableMapOf() }[eid] =
-                AlienMovement(speed, 1)
-            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(
-                Config.AlienSettings.SHOOT_INTERVAL,
-                0L,
-                Config.AlienSettings.SHOOT_CHANCE,
-                Config.BulletSettings.ALIEN_SPEED
-            )
+            world.getOrPut("alien_movement") { mutableMapOf() }[eid] = AlienMovement(speed, 1)
+            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(settings.alienShootIntervalMs, 0L, settings.alienShootChance, Config.BulletSettings.ALIEN_SPEED)
             world.getOrPut("collider") { mutableMapOf() }[eid] = true
         }
-        // Place lower aliens (no number)
-        getLowerFormationPositions(level).forEach { (x, y) ->
+
+        val lowerCount = Random.nextInt(settings.lowerEnemyMin, settings.lowerEnemyMax + 1)
+        getLowerFormationPositions(level, lowerCount).forEach { (x, y) ->
             val eid = newEntity()
             val image = Config.alienLowerSprites[shape]!!
             world.getOrPut("position") { mutableMapOf() }[eid] = Position(x, y)
             world.getOrPut("size") { mutableMapOf() }[eid] = Size(image.width, image.height)
-            world.getOrPut("render") { mutableMapOf() }[eid] =
-                mapOf("type" to "sprite", "image" to image, "text" to null)
+            world.getOrPut("render") { mutableMapOf() }[eid] = mapOf("type" to "sprite", "image" to image, "text" to null)
             world.getOrPut("alien") { mutableMapOf() }[eid] = Alien(null, shape)
-            world.getOrPut("alien_movement") { mutableMapOf() }[eid] =
-                AlienMovement(speed, 1)
-            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(
-                Config.AlienSettings.SHOOT_INTERVAL,
-                0L,
-                Config.AlienSettings.SHOOT_CHANCE,
-                Config.BulletSettings.ALIEN_SPEED
-            )
+            world.getOrPut("alien_movement") { mutableMapOf() }[eid] = AlienMovement(speed, 1)
+            world.getOrPut("shooter") { mutableMapOf() }[eid] = Shooter(settings.alienShootIntervalMs, 0L, settings.alienShootChance, Config.BulletSettings.ALIEN_SPEED)
             world.getOrPut("collider") { mutableMapOf() }[eid] = true
         }
     }
@@ -159,8 +137,7 @@ class GameController(val context: Context, val view: GameView) {
     }
 
     fun createBullet(shooterEid: Int, speed: Int) {
-        // Optional: Limit max bullets
-        if ((world["bullet"]?.size ?: 0) > 20) return
+        if ((world["bullet"]?.size ?: 0) > Config.currentBandSettings().maxBullets) return
 
         val posS = world["position"]?.get(shooterEid) as? Position ?: return
         val sizeS = world["size"]?.get(shooterEid) as? Size ?: return
@@ -168,11 +145,9 @@ class GameController(val context: Context, val view: GameView) {
         val by = if (speed < 0) posS.y - Config.BulletSettings.HEIGHT else posS.y + sizeS.height
         val eid = newEntity()
         world.getOrPut("position") { mutableMapOf() }[eid] = Position(bx, by)
-        world.getOrPut("size") { mutableMapOf() }[eid] =
-            Size(Config.BulletSettings.WIDTH, Config.BulletSettings.HEIGHT)
+        world.getOrPut("size") { mutableMapOf() }[eid] = Size(Config.BulletSettings.WIDTH, Config.BulletSettings.HEIGHT)
         world.getOrPut("velocity") { mutableMapOf() }[eid] = Velocity(0, speed)
-        world.getOrPut("render") { mutableMapOf() }[eid] =
-            mapOf("type" to "rect", "color" to Config.ColorSettings.WHITE)
+        world.getOrPut("render") { mutableMapOf() }[eid] = mapOf("type" to "rect", "color" to Config.ColorSettings.WHITE)
         world.getOrPut("bullet") { mutableMapOf() }[eid] = Bullet(shooterEid)
         world.getOrPut("collider") { mutableMapOf() }[eid] = true
     }
@@ -180,8 +155,6 @@ class GameController(val context: Context, val view: GameView) {
     fun update(delta: Double) = currentState.update(delta)
 
     fun draw(canvas: Canvas) = currentState.draw(canvas)
-
-    // Removed: fun handleTouch(event: MotionEvent) {}  (no touch support)
 
     fun handleJoystick(playerIndex: Int, dx: Float, dy: Float, shouldFire: Boolean) {
         val eid = playerEids.getOrNull(playerIndex) ?: return
@@ -208,7 +181,6 @@ class GameController(val context: Context, val view: GameView) {
     }
 
     fun restartGame() {
-        // Reset game state without restarting the activity
         level = 1
         world.clear()
         nextEntityId = 0
@@ -216,9 +188,23 @@ class GameController(val context: Context, val view: GameView) {
         playerEids.add(newEntity())
         playerEids.add(newEntity())
         setupPlayers()
-        Config.initSprites(context) // Reload sprites to ensure they are not recycled
+        Config.initSprites(context)
         switchState("level_transition")
     }
 }
 
-// Note: No major code changes were needed in this file for the requested improvements (explosions on player hits/crashes, respawn aura, bigger retro fonts). The logic for explosions and aura is handled in Systems.kt (CollisionSystem, LifespanSystem, RenderingSystem), and font changes are in Config.kt. This file remains as is, with the systems integrating the new features via the world ECS.
+fun generateDistractors(correctAnswer: Int, band: Config.GradeBand): List<Int> {
+    val near = listOf(correctAnswer - 2, correctAnswer - 1, correctAnswer + 1, correctAnswer + 2, correctAnswer + 10, correctAnswer - 10)
+        .filter { it > 0 }
+    val confusionStep = when (band) {
+        Config.GradeBand.G1_2 -> 5
+        Config.GradeBand.G3_4 -> 8
+        Config.GradeBand.G5_PLUS -> 12
+    }
+    val far = (correctAnswer + confusionStep * 3).coerceAtLeast(1)
+    return (near + listOf(correctAnswer + confusionStep, far))
+        .filter { it != correctAnswer }
+        .distinct()
+        .shuffled()
+        .take(4)
+}
